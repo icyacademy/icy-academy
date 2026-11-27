@@ -7,7 +7,7 @@
  * Segredos (SEGREDO, códigos de acesso) ficam na folha e nas propriedades do script, nunca aqui.
  */
 
-const VERSAO_CODIGO = 'v13 · pagamentos Urban Xpression'; // ICY_CODIGO_OK
+const VERSAO_CODIGO = 'v14 · Urban pelo horário semanal'; // ICY_CODIGO_OK
 const TZ = 'Europe/Lisbon';
 const TOKEN_DIAS = 180;
 
@@ -187,7 +187,7 @@ function dados_(user) {
     professores: professores_().filter(p => p.ativo).map(p => ({ nome: p.nome, email: p.email, perfil: p.perfil }))
   };
   if (user.perfil === 'Gestão') {
-    out.espaco = { nome: 'Urban Xpression', precoHora: ESPACO_EUR_HORA };
+    out.espaco = { nome: 'Urban Xpression', precoHora: ESPACO_EUR_HORA, desde: ESPACO_DESDE };
     out.pagEspaco = lerSeExistir_('Pagamentos Urban').filter(p => p['Mês (AAAA-MM)']).map(p => ({ mes: String(p['Mês (AAAA-MM)']), valor: num_(p['Valor (€)']), metodo: p['Método'], data: p['Data de pagamento'], horas: num_(p['Horas']), por: p['Registado por'], notas: p['Notas'] }));
     out.pagamentos = ler_('Pagamentos').filter(p => p['ID do aluno']).map(p => ({ aluno: p['ID do aluno'], mes: p['Mês (AAAA-MM)'], valor: num_(p['Valor (€)']), metodo: p['Método'], data: p['Data de pagamento'], notas: p['Notas'] }));
   }
@@ -550,6 +550,7 @@ function escreverLinha_(sh, t, linha, obj) {
 
 const RELATORIO_DESDE = '2026-12';
 const ALERTA_ASSIDUIDADE = 70;
+const ESPACO_DESDE = '2026-11'; // primeiro mês em que o aluguer é acompanhado pela app
 const ESPACO_EUR_HORA = 15; // aluguer da sala, calculado automaticamente pelas aulas dadas
 
 function ativarRelatorioMensal() {
@@ -660,6 +661,20 @@ function contasDoMes_(D, mes) {
   // Aluguer do espaço: horas de aula dadas no mês × preço por hora (agrupado por dia)
   const horas = (i, f) => { const a = String(i || '').split(':'), b = String(f || '').split(':'); const h = (Number(b[0]) * 60 + Number(b[1] || 0) - Number(a[0]) * 60 - Number(a[1] || 0)) / 60; return h > 0 ? h : 0; };
   const sessoes = {};
+  const contaEspaco = mes >= ESPACO_DESDE;
+  // Horário fixo: cada turma ativa conta em todos os seus dias da semana do mês, exceto aulas canceladas no calendário
+  const DS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  const canc = new Set((D.calendario || []).filter(c => c.tipo === 'Cancelada').map(c => c.data + '|' + c.turma));
+  if (contaEspaco) turmas.forEach(t => {
+    const wd = DS.findIndex(x => String(t.dia || '').toLowerCase().trim().indexOf(x) === 0);
+    if (wd < 0) return;
+    const p0 = mes.split('-').map(Number);
+    for (let d = new Date(p0[0], p0[1] - 1, 1, 12); d.getMonth() === p0[1] - 1; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== wd) continue;
+      const ds = Utilities.formatDate(d, TZ, 'yyyy-MM-dd');
+      if (!canc.has(ds + '|' + t.id)) sessoes[ds + '|' + t.id + '|Normal'] = { data: ds, turma: t.id, tipo: 'Normal' };
+    }
+  });
   pres.forEach(p => { sessoes[p.data + '|' + p.turma + '|' + p.tipo] = { data: p.data, turma: p.turma, tipo: p.tipo }; });
   const hojeTxt = fmtData_(new Date());
   (D.calendario || []).filter(c => String(c.data).slice(0, 7) === mes && c.tipo !== 'Cancelada' && String(c.data) <= hojeTxt)
@@ -669,7 +684,7 @@ function contasDoMes_(D, mes) {
     const x = sessoes[k]; const t = D.turmas.find(y => y.id === x.turma) || {};
     porDia[x.data] = (porDia[x.data] || 0) + horas(x.inicio || t.inicio, x.fim || t.fim);
   });
-  const espaco = Object.keys(porDia).filter(d => porDia[d] > 0).sort().map(d => ({
+  const espaco = Object.keys(porDia).filter(d => contaEspaco && porDia[d] > 0).sort().map(d => ({
     data: d, desc: 'Urban Xpression · aulas (' + String(porDia[d]).replace('.', ',') + ' h × ' + ESPACO_EUR_HORA + ' €)', cat: 'Urban Xpression (espaço)', valor: porDia[d] * ESPACO_EUR_HORA, notas: '', auto: true }));
   const despesas = espaco.concat(despesasDoMes_(mes));
   const totalDesp = despesas.reduce((s, x) => s + x.valor, 0);

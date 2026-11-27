@@ -921,11 +921,18 @@ VISTAS.pag = () => {
 /* ---------- Urban Xpression (aluguer do espaço) ---------- */
 const URBAN='Urban Xpression';
 function precoHora(){return (S.d.espaco&&S.d.espaco.precoHora)||15}
+function urbanDesde(){return (S.d.espaco&&S.d.espaco.desde)||'2026-11'}
 function horasEntre(i,f){const a=String(i||'').split(':'),b=String(f||'').split(':');const h=(Number(b[0])*60+Number(b[1]||0)-Number(a[0])*60-Number(a[1]||0))/60;return h>0?h:0}
 function fmtH(h){return String(Math.round(h*100)/100).replace('.',',')+' h'}
 /* Aulas no espaço num mês: as que tiveram presenças marcadas e as do calendário que não foram canceladas. */
 function sessoesUrban(m){
   const ses={}, hj=hoje();
+  if(m<urbanDesde()) return [];
+  // Horário fixo: cada turma ativa conta em todos os seus dias da semana do mês (exceto aulas canceladas no calendário)
+  const canc=new Set((S.d.calendario||[]).filter(c=>c.tipo==='Cancelada').map(c=>c.data+'|'+c.turma));
+  const ini=parse(m+'-01');
+  (S.d.turmas||[]).filter(t=>t.ativa!==false).forEach(t=>{const wd=DIAS.findIndex(x=>x.toLowerCase()===String(t.dia||'').toLowerCase().trim());if(wd<0)return;
+    const d=new Date(ini);while(d.getMonth()===ini.getMonth()){if(d.getDay()===wd){const ds=iso(d);if(!canc.has(ds+'|'+t.id))ses[ds+'|'+t.id+'|Normal']={data:ds,turma:t.id,tipo:'Normal'}}d.setDate(d.getDate()+1)}});
   (S.d.presencas||[]).filter(p=>p.data.slice(0,7)===m).forEach(p=>{const k=p.data+'|'+p.turma+'|'+(p.tipo||'Normal');ses[k]=ses[k]||{data:p.data,turma:p.turma,tipo:p.tipo||'Normal'}});
   (S.d.calendario||[]).filter(c=>String(c.data).slice(0,7)===m&&c.tipo!=='Cancelada').forEach(c=>{const k=c.data+'|'+c.turma+'|'+(c.tipo||'Normal');ses[k]=Object.assign(ses[k]||{},{data:c.data,turma:c.turma,tipo:c.tipo||'Normal',inicio:c.inicio,fim:c.fim})});
   const dias={};
@@ -949,7 +956,7 @@ function contaUrban(m){
 }
 function urbanEmDivida(){
   const out=[]; const atual=hoje().slice(0,7);
-  for(let i=1;i<=12;i++){const m=addMes(atual,-i);const c=contaUrban(m);if(c.total>0&&c.pago<c.total-0.005)out.push({m,falta:c.total-c.pago})}
+  for(let i=1;i<=24;i++){const m=addMes(atual,-i);if(m<urbanDesde())break;const c=contaUrban(m);if(c.total>0&&c.pago<c.total-0.005)out.push({m,falta:c.total-c.pago})}
   return out;
 }
 function vistaUrban(m){
@@ -957,17 +964,17 @@ function vistaUrban(m){
   const divida=urbanEmDivida().filter(x=>x.m!==m);
   let h=`<div class="hero" style="margin-top:12px"><div class="k">Aluguer do espaço · ${mesPT(m)}</div>
     <div class="nm">${eur(c.total).replace(',00','')}</div>
-    <div class="sub">${fmtH(c.horas+c.horasPrev)} de aulas × ${eur(c.ph).replace(',00','')}/h${c.horasPrev?` · ${fmtH(c.horasPrev)} ainda por dar`:''}</div>
+    <div class="sub">${c.dias.length} dia${c.dias.length===1?'':'s'} de aula · ${fmtH(c.horas+c.horasPrev)} × ${eur(c.ph).replace(',00','')}/h${c.prev.length?` · ${c.prev.length} ainda por dar`:''}</div>
+    <div class="sub" style="opacity:.75;font-size:12px;margin-top:2px">Pago no fim do mês</div>
     <span class="tag">${esc(c.est.txt)}</span></div>`;
   if(divida.length) h+=`<div class="card" style="margin-top:10px;border-color:var(--falta)"><div class="small" style="color:var(--falta)">⚠️ Em dívida: ${divida.map(x=>`<a data-a="irMesPag" data-x="${x.m}" style="text-decoration:underline;cursor:pointer">${esc(mesPT(x.m).toLowerCase())}</a> (${eur(x.falta)})`).join(', ')}</div></div>`;
   if(c.pg.length) h+=`<h3>Pagamento</h3>${c.pg.map(p=>`<div class="card row" style="gap:10px;margin-bottom:8px">${ic('hoje',18)}<div style="flex:1"><div><b>${eur(p.valor)}</b> · ${esc(p.metodo||'')}</div><div class="small muted">Pago a ${p.data?esc(p.data.split('-').reverse().join('/')):'–'}${p.notas?' · '+esc(p.notas):''}${p.por?' · '+esc(p.por):''}</div></div><button class="btn sm danger" style="min-height:30px;padding:4px 10px;font-size:12px" data-a="apagar" data-o="pagU" data-i="${S.d.pagEspaco.indexOf(p)}">Apagar</button></div>`).join('')}`;
   const falta=Math.max(0,c.total-c.pago);
   if(c.total>0&&falta>0.005) h+=`<button class="btn pri full" style="margin-top:12px" data-a="pagUrban">${ic('pag',18)} Registar pagamento de ${eur(falta)}</button>`;
-  if(c.dias.length) h+=`<button class="btn full" style="margin-top:8px" data-a="resumoUrban">${ic('copiar',18)} Resumo para a Urban</button>`;
   h+=`<h3>Aulas no espaço</h3>`+(c.dias.length?`<div class="list">${c.dias.map(d=>`<div class="pay" style="cursor:default;${d.futura?'opacity:.55':''}"><div style="flex:1;min-width:0"><div>${esc(cap(diaCurto(d.data)))}</div><div class="small muted">${esc(d.turmas.join(' + '))}${d.futura?' · prevista':''}</div></div><div class="v" style="text-align:right"><b>${eur(d.horas*c.ph)}</b><div class="small muted">${fmtH(d.horas)}</div></div></div>`).join('')}</div>`
     :`<div class="card empty">Sem aulas registadas neste mês. As aulas contam quando têm presenças marcadas ou estão no calendário.</div>`);
   // Histórico
-  const meses=[];for(let i=0;i<6;i++)meses.push(addMes(hoje().slice(0,7),-i));
+  const meses=[];for(let i=0;i<6;i++){const mm=addMes(hoje().slice(0,7),-i);if(mm<urbanDesde())break;meses.push(mm)}
   h+=`<h3>Últimos meses</h3><div class="list">${meses.map(mm=>{const x=contaUrban(mm);return `<div class="pay" data-a="irMesPag" data-x="${mm}" style="${mm===m?'border-color:var(--roxo)':''}"><div style="flex:1">${esc(mesPT(mm))}<div class="small muted">${fmtH(x.horas+x.horasPrev)} · ${eur(x.total)}</div></div><span class="badge ${x.est.cls}">${esc(x.est.txt)}</span></div>`}).join('')}</div>`;
   return h;
 }
@@ -988,11 +995,6 @@ function pagUrban(){
     S.d.pagEspaco=(S.d.pagEspaco||[]).concat([p]); lsSet('icy_dados',S.d);
     enfileirar('guardarPagEspaco',{pagamento:p}); fecharSheet(); render(); toast('Pagamento à '+URBAN+' registado');
   };
-}
-function resumoUrban(){
-  const m=S.mesPag, c=contaUrban(m);
-  const linhas=c.dias.map(d=>`• ${cap(diaCurto(d.data))}: ${fmtH(d.horas)}${d.futura?' (prevista)':''}`).join('\n');
-  wa('',`Olá! Aqui é a ICY Academy 💜\nResumo das aulas no espaço em ${MESES[Number(m.slice(5))-1]}:\n${linhas}\nTotal: ${fmtH(c.horas+c.horasPrev)} × ${eur(c.ph)} = ${eur(c.total)}`);
 }
 function verPag(aid){
   const a=aluno(aid), m=S.mesPag, e=esperadoMes(aid,m), s=estadoPagamento(aid,m);
@@ -1126,7 +1128,6 @@ document.addEventListener('click', e => {
     case 'pagTab': S.pagTab=el.dataset.x; lsSet('icy_pagTab',S.pagTab); render(); break;
     case 'irMesPag': S.mesPag=el.dataset.x; render(); window.scrollTo({top:0,behavior:'smooth'}); break;
     case 'pagUrban': pagUrban(); break;
-    case 'resumoUrban': resumoUrban(); break;
     case 'verPag': verPag(id); break;
     case 'waLembrete': { const al=aluno(id); const s=estadoPagamento(id,S.mesPag);
       wa(al.contactoEnc||al.contacto,`Olá${al.encarregado?' '+al.encarregado.split(' ')[0]:''}! 💜 Aqui é a ICY Academy.\nLembramos que o pagamento de ${MESES[Number(S.mesPag.slice(5))-1]} ${al.encarregado?'de '+(al.nomeReal||al.nome).split(' ')[0]+' ':''}(${eur(s.esperado-s.pago)}) ainda está por fazer. Pode ser por MB Way ou em mão na aula.\nObrigada! 🐧`); break; }
@@ -1154,7 +1155,7 @@ function demoDados(){
     turmas:[{id:'T001',nome:'MAKNAE',estilo:'K-pop',local:'São Brás de Alportel · Sede Urban Xpression',dia:'Sábado',inicio:'10:30',fim:'12:00',professor:'isalomemorais@gmail.com',mensalidade:40,precoAula:15,ativa:true,idades:'Menos de 18'},
             {id:'T002',nome:'UNNIE',estilo:'K-pop',local:'São Brás de Alportel · Sede Urban Xpression',dia:'Sábado',inicio:'12:00',fim:'13:30',professor:'isalomemorais@gmail.com',mensalidade:40,precoAula:15,ativa:true,idades:'18 ou mais'}],
     alunos,inscricoes,presencas,calendario:(()=>{const out=[];[addMes(m,-2),addMes(m,-1),m].forEach(mm=>{const d=parse(mm+'-01');while(d.getMonth()===parse(mm+'-01').getMonth()){if(d.getDay()===6)['T001','T002'].forEach(t=>out.push({data:iso(d),turma:t,tipo:'Normal'}));d.setDate(d.getDate()+1)}});return out})(),
-    espaco:{precoHora:15},pagEspaco:[{mes:addMes(m,-2),valor:180,metodo:'Transferência',data:addMes(m,-1)+'-01',notas:'',por:'Salomé Morais'}],
+    espaco:{precoHora:15,desde:addMes(m,-2)},pagEspaco:[{mes:addMes(m,-2),valor:180,metodo:'Transferência',data:addMes(m,-1)+'-01',notas:'',por:'Salomé Morais'}],
     covers:[{id:'C001',musica:'Girls Never Die',grupo:'tripleS',membros:24,turma:'T001',estado:'Em ensaio',practice:'https://www.youtube.com/results?search_query=tripleS+Girls+Never+Die+dance+practice',espelhado:'https://www.youtube.com/results?search_query=tripleS+Girls+Never+Die+dance+practice+mirrored',outros:'',notas:'Coreografia adaptada ao número de alunas.'},
             {id:'C002',musica:"Moonwalkin'",grupo:'LNGSHOT',membros:4,turma:'T002',estado:'Em ensaio',practice:'https://www.youtube.com/results?search_query=LNGSHOT+Moonwalkin+dance+practice',espelhado:'https://www.youtube.com/results?search_query=LNGSHOT+Moonwalkin+dance+practice+mirrored',outros:'',notas:''},
             {id:'C003',musica:'BURNING UP',grupo:'MEOVV',membros:5,turma:'T002',estado:'Em ensaio',practice:'https://www.youtube.com/watch?v=pI5rP1sl5UU',espelhado:'https://www.youtube.com/results?search_query=MEOVV+Burning+Up+dance+practice+mirrored',outros:'https://www.youtube.com/watch?v=3Io-WIiMKpA',notas:''}],
