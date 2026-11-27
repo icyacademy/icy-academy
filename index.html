@@ -431,7 +431,7 @@ function vistaHome(){
     ${tile('cal','cal','Calendário',planeado?cap(MESES[Number(m.slice(5))-1]):'Mês por planear')}
     ${tile('covers','covers','Covers',emEnsaio?emEnsaio+' em ensaio':'Nenhum em ensaio')}
     ${tile('eventos','trofeu','Eventos',esc(subEv),!gestao())}
-    ${gestao()?tile('pag','pag','Pagamentos',(porPagar?porPagar+' por pagar este mês':'Alunas em dia')+(urbanEmDivida().length?' · Urban por pagar':'')):''}
+    ${gestao()?tile('pag','pag','Pagamentos',(porPagar?porPagar+' por pagar este mês':'Alunos em dia')+(urbanEmDivida().length?' · Urban por pagar':'')):''}
   </div>
   <div class="rodape"><span id="sync" class="sync"></span><button data-a="${S.offline?'offlineOff':'offlineOn'}">${S.offline?'Voltar a online':'Modo offline'}</button><button data-a="menu">Conta</button></div>
   </div>`;
@@ -522,7 +522,7 @@ VISTAS.hoje = () => {
   const cvs=coversEmEnsaio(aula.turma);
   if(cvs.length) h+=`<h3>Em ensaio</h3><div class="list">${cvs.map(c=>`<div class="card"><div class="row"><div style="flex:1"><b>${esc(c.musica)}</b> <span class="muted">· ${esc(c.grupo)}</span></div></div>${linksCover(c)}</div>`).join('')}</div>`;
   const nS=lista.filter(a=>a.notas&&String(a.notas).trim()).length, nF=lista.filter(a=>a.imagem==='Não').length;
-  if(nS||nF) h+=`<div class="atencao" data-a="atencao">${ic('saude',18)}<span style="flex:1">${[nS?nS+(nS===1?' aluna com notas de saúde':' alunas com notas de saúde'):'',nF?nF+' sem autorização de imagem':''].filter(Boolean).join(' · ')}</span>${ic('right',16)}</div>`;
+  if(nS||nF) h+=`<div class="atencao" data-a="atencao">${ic('saude',18)}<span style="flex:1">${[nS?nS+(nS===1?' aluno com notas de saúde':' alunos com notas de saúde'):'',nF?nF+' sem autorização de imagem':''].filter(Boolean).join(' · ')}</span>${ic('right',16)}</div>`;
   h+=`<h3>Alunos (${lista.length})</h3>`;
   if(!lista.length) h+=`<div class="card empty small">Ainda não há alunos inscritos nesta turma.${gestao()?' Adicionem-nos no separador Alunos.':''}</div>`;
   else {
@@ -909,7 +909,7 @@ VISTAS.pag = () => {
   const esp=ests.reduce((s,x)=>s+x.s.esperado,0), rec=(S.d.pagamentos||[]).filter(p=>p.mes===m).reduce((s,p)=>s+(p.valor||0),0);
   const falta=ests.filter(x=>x.s.cls==='bad'||x.s.cls==='warn');
   let h=`<h2 class="sec">Pagamentos</h2>
-  <div class="seg" style="margin-bottom:12px">${[['alunas','Alunas'],['urban','Urban Xpression']].map(([k,t])=>`<button class="${(S.pagTab||'alunas')===k?'on':''}" data-a="pagTab" data-x="${k}">${t}</button>`).join('')}</div>
+  <div class="seg" style="margin-bottom:12px">${[['alunas','Alunos'],['urban','Urban Xpression']].map(([k,t])=>`<button class="${(S.pagTab||'alunas')===k?'on':''}" data-a="pagTab" data-x="${k}">${t}</button>`).join('')}</div>
   <div class="datebar"><button class="icobtn" data-a="mesPag" data-n="-1">${ic('left',18)}</button><div class="d">${mesPT(m)}</div><button class="icobtn" data-a="mesPag" data-n="1">${ic('right',18)}</button></div>`;
   if(S.pagTab==='urban') return h+vistaUrban(m);
   h+=`<div class="stats"><div class="stat"><b>${eur(rec).replace(',00','')}</b><span>recebido</span></div><div class="stat"><b>${eur(esp).replace(',00','')}</b><span>previsto</span></div><div class="stat"><b style="color:var(--falta)">${falta.length}</b><span>por pagar</span></div></div>`;
@@ -1156,7 +1156,7 @@ function demoDados(){
             {id:'T002',nome:'UNNIE',estilo:'K-pop',local:'São Brás de Alportel · Sede Urban Xpression',dia:'Sábado',inicio:'12:00',fim:'13:30',professor:'isalomemorais@gmail.com',mensalidade:40,precoAula:15,ativa:true,idades:'18 ou mais'}],
     alunos,inscricoes,presencas,calendario:(()=>{const out=[];[addMes(m,-2),addMes(m,-1),m].forEach(mm=>{const d=parse(mm+'-01');while(d.getMonth()===parse(mm+'-01').getMonth()){if(d.getDay()===6)['T001','T002'].forEach(t=>out.push({data:iso(d),turma:t,tipo:'Normal'}));d.setDate(d.getDate()+1)}});return out})(),
     espaco:{precoHora:15,desde:addMes(m,-2)},pagEspaco:[{mes:addMes(m,-2),valor:180,metodo:'Transferência',data:addMes(m,-1)+'-01',notas:'',por:'Salomé Morais'}],
-    covers:[{id:'C001',musica:'Girls Never Die',grupo:'tripleS',membros:24,turma:'T001',estado:'Em ensaio',practice:'https://www.youtube.com/results?search_query=tripleS+Girls+Never+Die+dance+practice',espelhado:'https://www.youtube.com/results?search_query=tripleS+Girls+Never+Die+dance+practice+mirrored',outros:'',notas:'Coreografia adaptada ao número de alunas.'},
+    covers:[{id:'C001',musica:'Girls Never Die',grupo:'tripleS',membros:24,turma:'T001',estado:'Em ensaio',practice:'https://www.youtube.com/results?search_query=tripleS+Girls+Never+Die+dance+practice',espelhado:'https://www.youtube.com/results?search_query=tripleS+Girls+Never+Die+dance+practice+mirrored',outros:'',notas:'Coreografia adaptada ao número de alunos.'},
             {id:'C002',musica:"Moonwalkin'",grupo:'LNGSHOT',membros:4,turma:'T002',estado:'Em ensaio',practice:'https://www.youtube.com/results?search_query=LNGSHOT+Moonwalkin+dance+practice',espelhado:'https://www.youtube.com/results?search_query=LNGSHOT+Moonwalkin+dance+practice+mirrored',outros:'',notas:''},
             {id:'C003',musica:'BURNING UP',grupo:'MEOVV',membros:5,turma:'T002',estado:'Em ensaio',practice:'https://www.youtube.com/watch?v=pI5rP1sl5UU',espelhado:'https://www.youtube.com/results?search_query=MEOVV+Burning+Up+dance+practice+mirrored',outros:'https://www.youtube.com/watch?v=3Io-WIiMKpA',notas:''}],
     posicoes:[{cover:'C003',aluno:'A006',parte:'SOOIN'},{cover:'C003',aluno:'A007',parte:'GAWON'}],

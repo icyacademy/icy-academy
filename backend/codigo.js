@@ -820,9 +820,9 @@ function htmlRelatorio_(D, mes, logo, teste) {
   // 3. Conta corrente das alunas
   const est = e => e === 'Pago' ? '<span class="ok">Pago</span>' : e === 'Em falta' ? '<span class="bad">Em falta</span>' : e === 'Parcial' ? '<span class="warn">Parcial</span>' : e;
   o += `<div class="sec">3. Mensalidades · conta corrente</div><table class="t">
-    <tr><th>Aluna</th><th>Turma</th><th>Plano</th><th class="r">Devido</th><th class="r">Pago</th><th class="r">Em dívida</th><th class="r">Estado</th></tr>
+    <tr><th>Aluno</th><th>Turma</th><th>Plano</th><th class="r">Devido</th><th class="r">Pago</th><th class="r">Em dívida</th><th class="r">Estado</th></tr>
     ${C.pagamentos.map(x => `<tr><td>${h(x.nome)}</td><td class="mut">${h(x.turmas)}</td><td class="mut">${h(x.plano)}</td><td class="r">${n(x.esperado)}</td><td class="r">${n(x.pago)}</td><td class="r">${x.esperado > x.pago ? n(x.esperado - x.pago) : '–'}</td><td class="r">${est(x.estado)}</td></tr>`).join('')}
-    <tr class="sub"><td colspan="3">Total (${C.pagamentos.length} alunas)</td><td class="r">${n(C.esperado)}</td><td class="r">${n(C.receitas - C.outros)}</td><td class="r">${n(C.emFalta.reduce((s, x) => s + x.esperado - x.pago, 0))}</td><td class="r">${pct_(C.receitas - C.outros, C.esperado)}</td></tr>
+    <tr class="sub"><td colspan="3">Total (${C.pagamentos.length} alunos)</td><td class="r">${n(C.esperado)}</td><td class="r">${n(C.receitas - C.outros)}</td><td class="r">${n(C.emFalta.reduce((s, x) => s + x.esperado - x.pago, 0))}</td><td class="r">${pct_(C.receitas - C.outros, C.esperado)}</td></tr>
   </table>`;
 
   // 4. Assiduidade
@@ -838,7 +838,7 @@ function htmlRelatorio_(D, mes, logo, teste) {
     return `<tr><td>${h(a.nome)}</td><td class="r mut">${a.presente}/${a.falta}/${a.just}</td><td class="r ${cls}">${pc == null ? '–' : pc + '%'}</td></tr>`;
   });
   const meio = Math.ceil(linhasA.length / 2);
-  const col = ls => `<table class="t"><tr><th>Aluna</th><th class="r">P / F / J</th><th class="r">%</th></tr>${ls.join('')}</table>`;
+  const col = ls => `<table class="t"><tr><th>Aluno</th><th class="r">P / F / J</th><th class="r">%</th></tr>${ls.join('')}</table>`;
   o += `<table style="margin-top:10px"><tr><td style="width:49%;vertical-align:top">${col(linhasA.slice(0, meio))}</td><td style="width:2%"></td><td style="width:49%;vertical-align:top">${col(linhasA.slice(meio))}</td></tr></table>`;
   o += `<div class="nota">P = presenças · F = faltas · J = faltas justificadas. A vermelho, assiduidade abaixo de ${ALERTA_ASSIDUIDADE}%.</div>`;
 
@@ -853,7 +853,7 @@ function htmlRelatorio_(D, mes, logo, teste) {
   const item = (k, v) => `<tr><td style="width:150px" class="mut">${k}</td><td>${v}</td></tr>`;
   o += `<div class="sec">5. Perspetiva para ${nm(prox)}</div><table class="t">
     ${item('Urban Xpression', C.urban.devido ? (C.urban.pago >= C.urban.devido - 0.005 ? '<span class="ok">Pago</span> ' + n(C.urban.pago) + (C.urban.data ? ' a ' + dm_(C.urban.data) : '') + ' (aluguer de ' + nm(mes) + ')' : '<span class="bad">Por pagar</span> ' + n(C.urban.devido - C.urban.pago) + ' do aluguer de ' + nm(mes)) : '<span class="mut">Sem aulas no espaço</span>')}
-    ${item('Receita prevista', '<b>' + n(recPrev) + '</b> em mensalidades (alunas ativas, plano mensal)')}
+    ${item('Receita prevista', '<b>' + n(recPrev) + '</b> em mensalidades (alunos ativos, plano mensal)')}
     ${item('Aulas marcadas', normais.length + (aulas.length - normais.length ? ' · ' + (aulas.length - normais.length) + ' cancelada(s): ' + aulas.filter(a => a.tipo === 'Cancelada').map(a => dm_(a.data) + ' ' + C.nomeT(a.turma)).join(', ') : ''))}
     ${aulas.filter(a => a.tipo === 'Reposição' || (a.tipo && a.tipo !== 'Normal' && a.tipo !== 'Cancelada')).length ? item('Aulas especiais', aulas.filter(a => a.tipo && a.tipo !== 'Normal' && a.tipo !== 'Cancelada').map(a => dm_(a.data) + ' ' + C.nomeT(a.turma) + ' (' + h(a.tipo) + ')').join(', ')) : ''}
     ${item('Eventos e prazos', evs.length ? evs.map(e => '<b>' + h(e.nome) + '</b>' + (e.prazo && String(e.prazo).slice(0, 7) === prox ? ' · prazo de inscrição ' + dm_(e.prazo) : '') + (e.data && String(e.data).slice(0, 7) === prox ? ' · ' + dm_(e.data) : '') + ' <span class="mut">(' + h(e.estado) + ')</span>').join('<br>') : '<span class="mut">Nada marcado</span>')}
@@ -875,7 +875,7 @@ function htmlRelatorio_(D, mes, logo, teste) {
     ${linha('Cobrança', pct_(C.receitas - C.outros, C.esperado) + (C.emFalta.length ? ' · em falta: ' + C.emFalta.map(x => h(x.nome)).join(', ') : ''))}
     ${linha('Urban Xpression', C.urban.devido ? (C.urban.pago >= C.urban.devido - 0.005 ? 'Pago (' + n(C.urban.pago) + ')' : 'Por pagar: ' + n(C.urban.devido - C.urban.pago)) : '–')}
     ${linha('Assiduidade', C.assiduidade + ' em ' + C.aulas + ' aulas')}
-    ${linha('Alunas ativas', C.ativos + (C.novas.length ? ' (+' + C.novas.length + (C.novas.length === 1 ? ' nova)' : ' novas)') : ''))}
+    ${linha('Alunos ativos', C.ativos + (C.novas.length ? ' (+' + C.novas.length + (C.novas.length === 1 ? ' novo)' : ' novos)') : ''))}
     </table>
     <p style="margin:14px 0 0;font-size:13px">O relatório completo segue em PDF, em anexo. <a href="{{URL}}" style="color:${ROXO}">Ver no Google Drive</a></p></div></div>`;
   return { html: o, email: email, titulo: titulo };
