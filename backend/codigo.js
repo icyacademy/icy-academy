@@ -7,7 +7,7 @@
  * Segredos (SEGREDO, códigos de acesso) ficam na folha e nas propriedades do script, nunca aqui.
  */
 
-const VERSAO_CODIGO = 'v12 · relatório mensal'; // ICY_CODIGO_OK
+const VERSAO_CODIGO = 'v13 · pagamentos Urban Xpression'; // ICY_CODIGO_OK
 const TZ = 'Europe/Lisbon';
 const TOKEN_DIAS = 180;
 
@@ -51,7 +51,7 @@ function novoCodigo_() {
 /* ---------- Entrada HTTP ---------- */
 
 function doGet() {
-  return json_({ ok: true, app: 'ICY Academy', hora: new Date().toISOString() });
+  return json_({ ok: true, app: 'ICY Academy', versao: VERSAO_CODIGO, hora: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -75,6 +75,8 @@ function doPost(e) {
         case 'guardarPosicoes': return json_(guardarPosicoes_(user, req));
         case 'guardarEvento': return json_(guardarEvento_(user, req));
         case 'apagarPagamento': return json_(apagarPagamento_(user, req));
+        case 'guardarPagEspaco': return json_(guardarPagEspaco_(user, req));
+        case 'apagarPagEspaco': return json_(apagarPagEspaco_(user, req));
         case 'apagarEvento': return json_(apagarPorId_('Eventos', req.id));
         case 'apagarCover': return json_(apagarCover_(user, req));
         default: throw new Error('Ação desconhecida');
@@ -185,6 +187,8 @@ function dados_(user) {
     professores: professores_().filter(p => p.ativo).map(p => ({ nome: p.nome, email: p.email, perfil: p.perfil }))
   };
   if (user.perfil === 'Gestão') {
+    out.espaco = { nome: 'Urban Xpression', precoHora: ESPACO_EUR_HORA };
+    out.pagEspaco = lerSeExistir_('Pagamentos Urban').filter(p => p['Mês (AAAA-MM)']).map(p => ({ mes: String(p['Mês (AAAA-MM)']), valor: num_(p['Valor (€)']), metodo: p['Método'], data: p['Data de pagamento'], horas: num_(p['Horas']), por: p['Registado por'], notas: p['Notas'] }));
     out.pagamentos = ler_('Pagamentos').filter(p => p['ID do aluno']).map(p => ({ aluno: p['ID do aluno'], mes: p['Mês (AAAA-MM)'], valor: num_(p['Valor (€)']), metodo: p['Método'], data: p['Data de pagamento'], notas: p['Notas'] }));
   }
   return out;
@@ -386,6 +390,38 @@ function guardarEvento_(user, req) {
     acrescentar_(sh, t, [obj]);
   }
   return { ok: true, id };
+}
+
+/* ---------- Pagamentos à Urban Xpression (aluguer do espaço) ---------- */
+function folhaUrban_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName('Pagamentos Urban');
+  if (!sh) {
+    sh = ss.insertSheet('Pagamentos Urban');
+    const cab = ['Mês (AAAA-MM)', 'Valor (€)', 'Data de pagamento', 'Método', 'Horas', 'Registado por', 'Notas'];
+    sh.getRange(1, 1, 1, cab.length).setValues([cab]).setBackground('#4A47C4').setFontColor('#FFFFFF').setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.getRange('A2:A').setNumberFormat('@');
+  }
+  return sh;
+}
+function guardarPagEspaco_(user, req) {
+  gestao_(user);
+  const p = req.pagamento || {};
+  if (!/^\d{4}-\d{2}$/.test(p.mes) || !(Number(p.valor) > 0)) throw new Error('Pagamento incompleto');
+  const sh = folhaUrban_();
+  sh.getRange(sh.getLastRow() + 1, 1, 1, 7).setValues([[p.mes, Number(p.valor), paraData_(p.data || fmtData_(new Date())), p.metodo || '', Number(p.horas) || '', user.nome, p.notas || '']]);
+  return { ok: true };
+}
+function apagarPagEspaco_(user, req) {
+  gestao_(user);
+  const p = req.pagamento || {};
+  const sh = folhaUrban_();
+  const t = tabela_(sh);
+  const i = t.linhas.findIndex(r => String(r['Mês (AAAA-MM)']).replace(/^'/, '') === p.mes && Math.abs(Number(r['Valor (€)']) - Number(p.valor)) < 0.005 && (!p.data || r['Data de pagamento'] === p.data));
+  if (i < 0) throw new Error('Pagamento não encontrado na folha');
+  sh.deleteRow(i + 2);
+  return { ok: true };
 }
 
 function apagarPagamento_(user, req) {
@@ -634,7 +670,7 @@ function contasDoMes_(D, mes) {
     porDia[x.data] = (porDia[x.data] || 0) + horas(x.inicio || t.inicio, x.fim || t.fim);
   });
   const espaco = Object.keys(porDia).filter(d => porDia[d] > 0).sort().map(d => ({
-    data: d, desc: 'Aluguer do espaço (' + String(porDia[d]).replace('.', ',') + ' h × ' + ESPACO_EUR_HORA + ' €)', cat: 'Espaço', valor: porDia[d] * ESPACO_EUR_HORA, notas: '', auto: true }));
+    data: d, desc: 'Urban Xpression · aulas (' + String(porDia[d]).replace('.', ',') + ' h × ' + ESPACO_EUR_HORA + ' €)', cat: 'Urban Xpression (espaço)', valor: porDia[d] * ESPACO_EUR_HORA, notas: '', auto: true }));
   const despesas = espaco.concat(despesasDoMes_(mes));
   const totalDesp = despesas.reduce((s, x) => s + x.valor, 0);
   const porCat = {};
@@ -646,6 +682,7 @@ function contasDoMes_(D, mes) {
   return {
     mes: mes, ativos: ativos.length, novas: novas, porTurma: porTurma, porAluna: porAluna,
     aulas: porTurma.reduce((s, t) => s + t.aulas, 0), assiduidade: pct_(presTot, pres.length),
+    urban: (function () { const ps = (D.pagEspaco || []).filter(x => x.mes === mes); return { devido: espaco.reduce((s2, x) => s2 + x.valor, 0), pago: ps.reduce((s2, x) => s2 + (x.valor || 0), 0), data: ps.length ? ps[ps.length - 1].data : '' }; })(),
     pagamentos: pagamentos, receitas: receitas, outros: outros, esperado: esperado, recAula: recAula, recMensal: recMensal, movPag: movPag,
     emFalta: pagamentos.filter(p => p.estado === 'Em falta' || p.estado === 'Parcial'),
     despesas: despesas, totalDesp: totalDesp, porCat: porCat, saldo: receitas - totalDesp,
@@ -800,6 +837,7 @@ function htmlRelatorio_(D, mes, logo, teste) {
   const cvs = D.covers.filter(c => c.estado === 'Em ensaio' || (c.apresentacao && String(c.apresentacao).slice(0, 7) === prox));
   const item = (k, v) => `<tr><td style="width:150px" class="mut">${k}</td><td>${v}</td></tr>`;
   o += `<div class="sec">5. Perspetiva para ${nm(prox)}</div><table class="t">
+    ${item('Urban Xpression', C.urban.devido ? (C.urban.pago >= C.urban.devido - 0.005 ? '<span class="ok">Pago</span> ' + n(C.urban.pago) + (C.urban.data ? ' a ' + dm_(C.urban.data) : '') + ' (aluguer de ' + nm(mes) + ')' : '<span class="bad">Por pagar</span> ' + n(C.urban.devido - C.urban.pago) + ' do aluguer de ' + nm(mes)) : '<span class="mut">Sem aulas no espaço</span>')}
     ${item('Receita prevista', '<b>' + n(recPrev) + '</b> em mensalidades (alunas ativas, plano mensal)')}
     ${item('Aulas marcadas', normais.length + (aulas.length - normais.length ? ' · ' + (aulas.length - normais.length) + ' cancelada(s): ' + aulas.filter(a => a.tipo === 'Cancelada').map(a => dm_(a.data) + ' ' + C.nomeT(a.turma)).join(', ') : ''))}
     ${aulas.filter(a => a.tipo === 'Reposição' || (a.tipo && a.tipo !== 'Normal' && a.tipo !== 'Cancelada')).length ? item('Aulas especiais', aulas.filter(a => a.tipo && a.tipo !== 'Normal' && a.tipo !== 'Cancelada').map(a => dm_(a.data) + ' ' + C.nomeT(a.turma) + ' (' + h(a.tipo) + ')').join(', ')) : ''}
@@ -820,6 +858,7 @@ function htmlRelatorio_(D, mes, logo, teste) {
     <table style="border-collapse:collapse;width:100%">
     ${linha('Receitas', n(C.receitas))}${linha('Despesas', n(C.totalDesp))}${linha('<b>Resultado do mês</b>', '<b>' + n(C.saldo) + '</b>')}
     ${linha('Cobrança', pct_(C.receitas - C.outros, C.esperado) + (C.emFalta.length ? ' · em falta: ' + C.emFalta.map(x => h(x.nome)).join(', ') : ''))}
+    ${linha('Urban Xpression', C.urban.devido ? (C.urban.pago >= C.urban.devido - 0.005 ? 'Pago (' + n(C.urban.pago) + ')' : 'Por pagar: ' + n(C.urban.devido - C.urban.pago)) : '–')}
     ${linha('Assiduidade', C.assiduidade + ' em ' + C.aulas + ' aulas')}
     ${linha('Alunas ativas', C.ativos + (C.novas.length ? ' (+' + C.novas.length + (C.novas.length === 1 ? ' nova)' : ' novas)') : ''))}
     </table>

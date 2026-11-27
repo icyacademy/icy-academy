@@ -1,5 +1,5 @@
 // Guarda a app no telemóvel para abrir rápido e funcionar sem rede.
-const VERSAO = 'icy-v17';
+const VERSAO = 'icy-v18';
 const FICHEIROS = ['./', './index.html', './config.js', './manifest.webmanifest', './logo-branco.png',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './apple-touch-icon.png'];
 
